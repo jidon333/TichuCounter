@@ -39,6 +39,9 @@ SearchCardList = ['1','2','3','4','5','6','7','8','9','10','j','q','k','a', Dog,
 SearchArea_pg = (748, 1028, 1044, 156) # x,y,w,h
 SearchArea_cv2 = (700,940,1870,1180) # x1, y1, x2, y2
 
+exitFlag = False
+
+
 def PrintCards():
     printStr = ""
     LastCard = ""
@@ -123,9 +126,8 @@ def PickupCards_cv2(card, screenImg):
 
     method = cv.TM_CCOEFF_NORMED
 
-    threshold = 0.9
-    if card == Phoenix:
-        threshold = 0.85
+    threshold = 0.85
+
 
     ## result(optional): 매칭 결과, (W - w + 1) x (H - h + 1) 크기의 2차원 배열 [여기서 W, H는 입력 이미지의 너비와 높이, w, h는 템플릿 이미지의 너비와 높이]
     res = cv.matchTemplate(screenImg, template, method)
@@ -210,6 +212,7 @@ def RunCardCounter_pg():
 
 def RunCardCounter_cv2():
     lastCombo = []
+    comboQueue = []
 
     while True:
         #start check time
@@ -224,18 +227,28 @@ def RunCardCounter_cv2():
     
         #print("PickupCards elapsed time :", time.time() - start)
 
-        if lastCombo != combo: 
-            print("verified")
-            for c in combo:
-                RemoveCard(c)
+        comboQueue.append(combo)
+        if len(comboQueue) > 3:
+            comboQueue.pop(0)
 
-            print("--------------------------------------")
-            PrintCards()
-    
-    lastCombo = combo
+        if len(comboQueue) == 3:
+            if comboQueue[0] == comboQueue[1] == combo and combo != lastCombo:
+                print("Verified!!")
+                lastCombo = combo
+                comboQueue.clear()
+                for c in combo:
+                    RemoveCard(c)
+                print("--------------------------------------")
+                PrintCards()
+
+
+        if exitFlag == True:
+            print("program is ended by user")
+            break;
 
 def RunCardCounter_cv2_MultiThread():
     lastCombo = []
+    comboQueue = []
     while True:
         # start check time
         start = time.time()
@@ -248,30 +261,59 @@ def RunCardCounter_cv2_MultiThread():
         combo.sort()
     
         #print("PickupCards elapsed time[Multi-threading]:", time.time() - start)
+ 
+        comboQueue.append(combo)
+        if len(comboQueue) > 3:
+            comboQueue.pop(0)
 
-        if lastCombo != combo: 
-            print("verified")
-            for c in combo:
-                RemoveCard(c)
-            print("--------------------------------------")
-            PrintCards()
-    
-        lastCombo = combo
+        if len(comboQueue) == 3:
+            if comboQueue[0] == comboQueue[1] == combo and combo != lastCombo:
+                print("Verified!!")
+                lastCombo = combo
+                comboQueue.clear()
+                for c in combo:
+                    RemoveCard(c)
+                print("--------------------------------------")
+                PrintCards()
 
 
+        if exitFlag == True:
+            print("program is ended by user")
+            break;
+        
 
 
+def get_input():
+    global exitFlag
+    while True:
+        keystrk=input("write 'exit' to restart counter \n")
+        # thread doesn't continue until key is pressed
+        if keystrk == "exit":
+            exitFlag=True
+            print("restart command excuted! \n")
+            
 
-print("waiting...3")
+i=threading.Thread(target=get_input)
+i.start()
+
 time.sleep(1)
-print("waiting...2")
-time.sleep(1)
-print("waiting...1")
-time.sleep(1)
+
+while True:
+
+    print("waiting...3")
+    time.sleep(1)
+    print("waiting...2")
+    time.sleep(1)
+    print("waiting...1")
+    time.sleep(1)
+
+    RunCardCounter_cv2_MultiThread()
+    exitFlag = False
+
+
 
 #RunCardCounter_pg()
 #RunCardCounter_cv2()
-RunCardCounter_cv2_MultiThread()
 
 
 
