@@ -34,6 +34,7 @@ Cards.append(Dog)
 Cards.append(Phoenix)
 Cards.append(Dragon)
 
+SearchCardList = ['1','2','3','4','5','6','7','8','9','10','j','q','k','a', Dog, Phoenix, Dragon]
 
 SearchArea_pg = (748, 1028, 1044, 156) # x,y,w,h
 SearchArea_cv2 = (700,940,1870,1180) # x1, y1, x2, y2
@@ -101,6 +102,10 @@ def PickupCards_pg(card):
 
 
 def CaptureScreenImg():
+    # 이 함수를 먼저 호출하는 것으로
+    # 스크린 캡처를 검색보다 먼저 진행하기 때문에 1~dragon 카드를 검색하는 도중에 카드가 내어 지는 경우는 없다.
+    # 카드를 내는 도중에 캡처하는 경우는 생길 수가 있겠지만.. 이것은 여러번 캡쳐해서 교차검증을 하면 
+
     # 사각형 영역 캡쳐해서 이미지화
     screenImg = ImageGrab.grab(bbox=SearchArea_cv2)
     screenImg = np.array(screenImg)
@@ -119,6 +124,8 @@ def PickupCards_cv2(card, screenImg):
     method = cv.TM_CCOEFF_NORMED
 
     threshold = 0.9
+    if card == Phoenix:
+        threshold = 0.85
 
     ## result(optional): 매칭 결과, (W - w + 1) x (H - h + 1) 크기의 2차원 배열 [여기서 W, H는 입력 이미지의 너비와 높이, w, h는 템플릿 이미지의 너비와 높이]
     res = cv.matchTemplate(screenImg, template, method)
@@ -144,7 +151,7 @@ def PickupCards_cv2(card, screenImg):
             #screenImg = cv.rectangle(screenImg,(max_loc[0],max_loc[1]), (max_loc[0]+w+1, max_loc[1]+h+1), (0,255,0) )
             cnt += 1
             
-                
+    
     #cv.imwrite('output.png', screenImg)
     return cnt
 
@@ -158,6 +165,102 @@ def DisplayCaptureImage():
     # and finally destroy/close all open windows
     cv.destroyAllWindows()
 
+################### 멀티스레드로 실행 코드 #######################
+def CountCardForThread(card, screenImg):
+    count = PickupCards_cv2(card, screenImg)
+    return (card, count)
+
+def CountCards_MultiThread():
+    screenImg = CaptureScreenImg()
+    values_for_each_image = []
+    with ThreadPoolExecutor(20) as executor:
+        results = {executor.submit(CountCardForThread, card, screenImg) for card in SearchCardList}
+        for result in as_completed(results):
+            values_for_each_image.append(result.result())
+    return(values_for_each_image)
+
+#################################################################
+
+
+
+def RunCardCounter_pg():
+    lastCombo = []
+    while True:
+        #start check time
+        start = time.time()
+        combo = []
+    
+        for card in SearchCardList:
+            num = PickupCards_pg(card)
+            for i in range (0, num):
+                combo.append(card)
+    
+        #print("PickupCards elapsed time :", time.time() - start)
+
+        if lastCombo != combo: 
+            print("verified")
+            for c in combo:
+                RemoveCard(c)
+
+            print("--------------------------------------")
+            PrintCards()
+    
+        lastCombo = combo
+
+
+def RunCardCounter_cv2():
+    lastCombo = []
+
+    while True:
+        #start check time
+        start = time.time()
+        combo = []
+    
+        screenImg = CaptureScreenImg()
+        for card in SearchCardList:
+            num = PickupCards_cv2(card, screenImg)
+            for i in range (0, num):
+                combo.append(card)
+    
+        #print("PickupCards elapsed time :", time.time() - start)
+
+        if lastCombo != combo: 
+            print("verified")
+            for c in combo:
+                RemoveCard(c)
+
+            print("--------------------------------------")
+            PrintCards()
+    
+    lastCombo = combo
+
+def RunCardCounter_cv2_MultiThread():
+    lastCombo = []
+    while True:
+        # start check time
+        start = time.time()
+        combo = []
+        res = CountCards_MultiThread()
+
+        for r in res:
+            for i in range(0, r[1]):
+                combo.append(r[0])
+        combo.sort()
+    
+        #print("PickupCards elapsed time[Multi-threading]:", time.time() - start)
+
+        if lastCombo != combo: 
+            print("verified")
+            for c in combo:
+                RemoveCard(c)
+            print("--------------------------------------")
+            PrintCards()
+    
+        lastCombo = combo
+
+
+
+
 
 print("waiting...3")
 time.sleep(1)
@@ -166,32 +269,9 @@ time.sleep(1)
 print("waiting...1")
 time.sleep(1)
 
-SearchCardList = ['1','2','3','4','5','6','7','8','9','10','j','q','k','a', Dog, Phoenix, Dragon]
-lastCombo = []
-
-while True:
-    #start check time
-    start = time.time()
-    combo = []
-    screenImg =CaptureScreenImg()
-    for card in SearchCardList:
-        num = PickupCards_cv2(card, screenImg)
-        for i in range (0, num):
-            combo.append(card)
-    
-    print("PickupCards elapsed time :", time.time() - start)
-
-    if lastCombo != combo: 
-        print("verified")
-        for c in combo:
-            RemoveCard(c)
-
-    print("--------------------------------------")
-    PrintCards()
-    
-    lastCombo = combo
-
-
+#RunCardCounter_pg()
+#RunCardCounter_cv2()
+RunCardCounter_cv2_MultiThread()
 
 
 
