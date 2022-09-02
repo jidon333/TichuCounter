@@ -16,23 +16,12 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 print("Tichu counter ")
 
 CardList = ['2','3','4','5','6','7','8','9','10','J','Q','K','A']
-Cards = []
-Cards.append('1')
-
-for Card in CardList:
-    Cards.append(Card)
-    Cards.append(Card)
-    Cards.append(Card)
-    Cards.append(Card)
-
-
 Dog = "Dog"
 Phoenix = "Phoenix"
 Dragon = "Dragon"
 
-Cards.append(Dog)
-Cards.append(Phoenix)
-Cards.append(Dragon)
+Cards = []
+
 
 SearchCardList = ['1','2','3','4','5','6','7','8','9','10','j','q','k','a', Dog, Phoenix, Dragon]
 
@@ -41,6 +30,21 @@ SearchArea_cv2 = (700,940,1870,1180) # x1, y1, x2, y2
 
 exitFlag = False
 
+def ResetCards():
+    Cards.clear()
+    Cards.append('1')
+
+    for Card in CardList:
+        Cards.append(Card)
+        Cards.append(Card)
+        Cards.append(Card)
+        Cards.append(Card)
+
+    Cards.append(Dog)
+    Cards.append(Phoenix)
+    Cards.append(Dragon)
+
+    print("Cards reset finished! \n")
 
 def PrintCards():
     printStr = ""
@@ -286,19 +290,23 @@ def RunCardCounter_cv2_MultiThread():
 def get_input():
     global exitFlag
     while True:
-        keystrk=input("write 'exit' to restart counter \n")
+        keystrk=input("")
         # thread doesn't continue until key is pressed
         if keystrk == "exit":
             exitFlag=True
             print("restart command excuted! \n")
             
 
+
+# start input thread for exit.
 i=threading.Thread(target=get_input)
 i.start()
-
 time.sleep(1)
 
+# main logic
 while True:
+
+    ResetCards()
 
     print("waiting...3")
     time.sleep(1)
