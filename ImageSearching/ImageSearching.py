@@ -1,11 +1,17 @@
+# -*- coding: utf-8 -*-
 
 from ctypes import windll
 import pyautogui as pg
 import time
 import threading
-
+import cv2 as cv
+import numpy as np
 from PIL import ImageGrab
+from PIL import Image
 from functools import partial
+# multi-threading
+from concurrent.futures import ThreadPoolExecutor, as_completed
+
 
 print("Tichu counter ")
 
@@ -29,6 +35,9 @@ Cards.append(Phoenix)
 Cards.append(Dragon)
 
 
+SearchArea_pg = (748, 1028, 1044, 156) # x,y,w,h
+SearchArea_cv2 = (700,940,1870,1180) # x1, y1, x2, y2
+
 def PrintCards():
     printStr = ""
     LastCard = ""
@@ -43,8 +52,6 @@ def PrintCards():
         LastCard = s
         
     print(printStr)
-
-
 def RemoveCard(a):
     print("RemoveCard: ", a)
     if len(a) == 0:
@@ -64,12 +71,10 @@ def RemoveCard(a):
             Cards.remove(Phoenix)
     except ValueError:
         pass
-   
-
-def PickupCards(card):
+def PickupCards_pg(card):
     imgName = card + ".png"
 
-    results = pg.locateAllOnScreen(imgName, confidence =0.8, grayscale = True, region=(748, 1028, 1044, 156))
+    results = pg.locateAllOnScreen(imgName, confidence =0.8, grayscale = True, region=SearchArea_pg)
     results = list(results)
 
     filteredList = []
@@ -95,6 +100,64 @@ def PickupCards(card):
     return len(filteredList)
 
 
+def CaptureScreenImg():
+    # 사각형 영역 캡쳐해서 이미지화
+    screenImg = ImageGrab.grab(bbox=SearchArea_cv2)
+    screenImg = np.array(screenImg)
+    screenImg = cv.cvtColor(screenImg, cv.COLOR_BGR2GRAY)
+    return screenImg
+
+def PickupCards_cv2(card, screenImg):
+
+    templateName = card + ".png"
+
+    ## 찾을 이미지
+    template = cv.imread(templateName, cv.IMREAD_GRAYSCALE)
+
+    h, w = template.shape
+
+    method = cv.TM_CCOEFF_NORMED
+
+    threshold = 0.9
+
+    ## result(optional): 매칭 결과, (W - w + 1) x (H - h + 1) 크기의 2차원 배열 [여기서 W, H는 입력 이미지의 너비와 높이, w, h는 템플릿 이미지의 너비와 높이]
+    res = cv.matchTemplate(screenImg, template, method)
+
+    # 최소 값, 최대 값, 최소 지점, 최대 지점
+    # 최소 포인터의 값을 이용하여 유사도가 가장 낮을 때를 알 수 있다.
+    # 가장 밝거나 가장 어두운 지점이 매칭되는 지점이다.
+    # 보면 좋을 링크 https://velog.io/@codren/%ED%85%9C%ED%94%8C%EB%A6%BF-%EB%A7%A4%EC%B9%AD
+
+    cnt = 0
+    max_val = 0
+    while True:
+        min_val, max_val, min_loc, max_loc = cv.minMaxLoc(res)
+        if max_val < threshold:
+            break
+    
+        # 적중하는 곳을 찾으면
+        if max_val > threshold:
+            ## https://iop8890.tistory.com/9 (Numpy(넘파이) ndarray 다차원 배열 문법 참조
+            ## 일단 2차원 배열에서 적중된 곳(가장 정확도가 최댓값) 으로부터 이미지 사이즈 +- 만큼 0으로 채워서 다시 검출 안되게 하고
+            res[max_loc[1]-h :max_loc[1]+h, max_loc[0]-w : max_loc[0]+w] = 0
+            ## 적중한곳에다가 네모그리기
+            #screenImg = cv.rectangle(screenImg,(max_loc[0],max_loc[1]), (max_loc[0]+w+1, max_loc[1]+h+1), (0,255,0) )
+            cnt += 1
+            
+                
+    #cv.imwrite('output.png', screenImg)
+    return cnt
+
+
+def DisplayCaptureImage():
+    image = cv.imread('output.png')
+    # show the image, provide window name first
+    cv.imshow('image window', image)
+    # add wait key. window waits until user presses a key
+    cv.waitKey()
+    # and finally destroy/close all open windows
+    cv.destroyAllWindows()
+
 
 print("waiting...3")
 time.sleep(1)
@@ -107,24 +170,29 @@ SearchCardList = ['1','2','3','4','5','6','7','8','9','10','j','q','k','a', Dog,
 lastCombo = []
 
 while True:
-    # start check time
-    ##start = time.time()
+    #start check time
+    start = time.time()
     combo = []
+    screenImg =CaptureScreenImg()
     for card in SearchCardList:
-        num = PickupCards(card)
+        num = PickupCards_cv2(card, screenImg)
         for i in range (0, num):
             combo.append(card)
     
+    print("PickupCards elapsed time :", time.time() - start)
+
     if lastCombo != combo: 
         print("verified")
         for c in combo:
             RemoveCard(c)
-        print("--------------------------------------")
-        PrintCards()
+
+    print("--------------------------------------")
+    PrintCards()
     
     lastCombo = combo
 
-    ##print("PickupCards elapsed time :", time.time() - start)
+
+
 
 
  
