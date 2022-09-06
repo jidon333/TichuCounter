@@ -26,9 +26,11 @@ Cards = []
 SearchCardList = ['1','2','3','4','5','6','7','8','9','10','j','q','k','a', Dog, Phoenix, Dragon]
 
 SearchArea_pg = (748, 1028, 1044, 156) # x,y,w,h
-SearchArea_cv2 = (700,940,1870,1180) # x1, y1, x2, y2
+SearchArea_cv2 = (700, 940, 1870, 1180) # x1, y1, x2, y2
+SearchArea_cv2_PostWin = (700, 940, 1870, 1380)
 
 exitFlag = False
+winFlag = False
 
 def ResetCards():
     Cards.clear()
@@ -114,7 +116,12 @@ def CaptureScreenImg():
     # 카드를 내는 도중에 캡처하는 경우는 생길 수가 있겠지만.. 이것은 여러번 캡쳐해서 교차검증을 하면 
 
     # 사각형 영역 캡쳐해서 이미지화
-    screenImg = ImageGrab.grab(bbox=SearchArea_cv2)
+    if winFlag == False:
+        screenBox = SearchArea_cv2
+    else:
+        screenBox = SearchArea_cv2_PostWin
+
+    screenImg = ImageGrab.grab(bbox=screenBox)
     screenImg = np.array(screenImg)
     screenImg = cv.cvtColor(screenImg, cv.COLOR_BGR2GRAY)
     return screenImg
@@ -131,6 +138,8 @@ def PickupCards_cv2(card, screenImg):
     method = cv.TM_CCOEFF_NORMED
 
     threshold = 0.85
+    if card == Phoenix:
+        threshold = 0.8
 
 
     ## result(optional): 매칭 결과, (W - w + 1) x (H - h + 1) 크기의 2차원 배열 [여기서 W, H는 입력 이미지의 너비와 높이, w, h는 템플릿 이미지의 너비와 높이]
@@ -153,16 +162,16 @@ def PickupCards_cv2(card, screenImg):
             ## https://iop8890.tistory.com/9 (Numpy(넘파이) ndarray 다차원 배열 문법 참조
             ## 일단 2차원 배열에서 적중된 곳(가장 정확도가 최댓값) 으로부터 이미지 사이즈 +- 만큼 0으로 채워서 다시 검출 안되게 하고
             res[max_loc[1]-h :max_loc[1]+h, max_loc[0]-w : max_loc[0]+w] = 0
-            ## 적중한곳에다가 네모그리기
+            ## 적중한곳에다가 네모그리기 (멀티스레드 활성화 x)
             #screenImg = cv.rectangle(screenImg,(max_loc[0],max_loc[1]), (max_loc[0]+w+1, max_loc[1]+h+1), (0,255,0) )
             cnt += 1
             
-    
+    # 파일쓰기(멀티스레드 활성화 x)
     #cv.imwrite('output.png', screenImg)
     return cnt
 
 
-def DisplayCaptureImage():
+def DisplayCapturedImage():
     image = cv.imread('output.png')
     # show the image, provide window name first
     cv.imshow('image window', image)
@@ -263,6 +272,8 @@ def RunCardCounter_cv2_MultiThread():
             for i in range(0, r[1]):
                 combo.append(r[0])
         combo.sort()
+
+        #DisplayCapturedImage()
     
         #print("PickupCards elapsed time[Multi-threading]:", time.time() - start)
  
@@ -289,12 +300,20 @@ def RunCardCounter_cv2_MultiThread():
 
 def get_input():
     global exitFlag
+    global winFlag
     while True:
         keystrk=input("")
         # thread doesn't continue until key is pressed
         if keystrk == "exit":
             exitFlag=True
             print("restart command excuted! \n")
+
+        elif keystrk == 'win':
+            winFlag = True
+            print("win command excuted! Change the search area. \n. ")
+
+
+
             
 
 
@@ -305,6 +324,10 @@ time.sleep(1)
 
 # main logic
 while True:
+
+
+    #print(pg.position())
+    #time.sleep(1)
 
     ResetCards()
 
@@ -317,12 +340,5 @@ while True:
 
     RunCardCounter_cv2_MultiThread()
     exitFlag = False
+    winFlag = False
 
-
-
-#RunCardCounter_pg()
-#RunCardCounter_cv2()
-
-
-
- 
